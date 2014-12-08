@@ -2148,6 +2148,7 @@ bool address_space_rw(AddressSpace *as, hwaddr addr, uint8_t *buf,
                 default:
                     abort();
                 }
+//        		usleep(200000);
             } else {
                 addr1 += memory_region_get_ram_addr(mr);
                 /* RAM case */

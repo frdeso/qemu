@@ -102,7 +102,9 @@ static void *worker_thread(void *opaque)
         req->state = THREAD_ACTIVE;
         qemu_mutex_unlock(&pool->lock);
 
+    	trace_thread_pool_handle_request(pool, req, req->arg);
         ret = req->func(req->arg);
+    	trace_thread_pool_handle_request_done(pool, req, req->arg);
 
         req->ret = ret;
         /* Write ret before state.  */
@@ -256,6 +258,7 @@ BlockAIOCB *thread_pool_submit_aio(ThreadPool *pool,
     QTAILQ_INSERT_TAIL(&pool->request_list, req, reqs);
     qemu_mutex_unlock(&pool->lock);
     qemu_sem_post(&pool->sem);
+
     return &req->common;
 }
 

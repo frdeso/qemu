@@ -40,6 +40,9 @@
 
 #include "hw/boards.h"
 
+#include "freezer.h"
+#include <sysemu/cpus.h>
+
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
 #include <sys/eventfd.h>
@@ -1631,6 +1634,7 @@ static void kvm_handle_io(uint16_t port, void *data, int direction, int size,
     for (i = 0; i < count; i++) {
         address_space_rw(&address_space_io, port, ptr, size,
                          direction == KVM_EXIT_IO_OUT);
+
         ptr += size;
     }
 }
@@ -1735,13 +1739,19 @@ void kvm_cpu_clean_state(CPUState *cpu)
     cpu->kvm_vcpu_dirty = false;
 }
 
+#define CMP_RANGE(__port, __lower, __upper) \
+	(__port >= __lower && __port <= __upper)
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
     int ret, run_ret;
-
+	struct kvm_clock_data kcd;
     DPRINTF("kvm_cpu_exec()\n");
 
+    freezer_prod_sem_init();
+    freezer_cons_sem_init();
+    int freeze = false;
     if (kvm_arch_process_async_events(cpu)) {
         cpu->exit_request = 0;
         return EXCP_HLT;
@@ -1765,6 +1775,23 @@ int kvm_cpu_exec(CPUState *cpu)
         }
         qemu_mutex_unlock_iothread();
 
+		/*
+		 * According to /proc/ioports in the vm the ide ports are
+		 * between 0xc040 and 0xc04f (0d49216 and 0d49231)
+		 * Not sure if these may change at reboot.
+		 */
+         if(freeze)
+         {
+            //We unlock the io threads so they can handle the request
+	  	    freezer_cons_sem_wait();
+	  	    //usleep(300);
+            freeze=false;
+            trace_point_e();
+    		KVMState *s = cpu->kvm_state;
+    		//kcd.clock += 1000000;
+			kvm_vm_ioctl(s, KVM_SET_CLOCK, &kcd);
+         }
+
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
 
         qemu_mutex_lock_iothread();
@@ -1786,6 +1813,21 @@ int kvm_cpu_exec(CPUState *cpu)
         switch (run->exit_reason) {
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");
+			trace_io_req_on_port(run->io.port, run->io.direction != KVM_EXIT_IO_OUT,
+                                    run->io.size, run->io.count);
+            int port = run->io.port;
+            if(	CMP_RANGE(port, 0x0170, 0x0177) ||
+	            CMP_RANGE(port, 0x01f0, 0x01f7) ||
+	            CMP_RANGE(port, 0x0376, 0x0376) ||
+	            CMP_RANGE(port, 0x03f6, 0x03f6) ||
+	            CMP_RANGE(port, 0xc040, 0xc040)	)
+            {
+           		freeze = true;
+           		freezer_cons_sem_init();
+            	freezer_cons_sem_post();
+    			KVMState *s = cpu->kvm_state;
+				kvm_vm_ioctl(s, KVM_GET_CLOCK, &kcd);
+            }
             kvm_handle_io(run->io.port,
                           (uint8_t *)run + run->io.data_offset,
                           run->io.direction,
@@ -1879,6 +1921,8 @@ int kvm_vm_ioctl(KVMState *s, int type, ...)
     va_end(ap);
 
     trace_kvm_vm_ioctl(type, arg);
+	freezer_cons_sem_post();
+	usleep(100);
     ret = ioctl(s->vmfd, type, arg);
     if (ret == -1) {
         ret = -errno;
@@ -1895,6 +1939,11 @@ int kvm_vcpu_ioctl(CPUState *cpu, int type, ...)
     va_start(ap, type);
     arg = va_arg(ap, void *);
     va_end(ap);
+
+//	if(freezer_prod_sem_trywait() == 0)
+//	{
+//		freezer_cons_sem_post();
+//	}
 
     trace_kvm_vcpu_ioctl(cpu->cpu_index, type, arg);
     ret = ioctl(cpu->kvm_fd, type, arg);

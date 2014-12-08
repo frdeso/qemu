@@ -39,7 +39,7 @@
 #include "qapi/qmp/qerror.h"
 
 //#define DEBUG_KVM
-
+#include <trace.h>
 #ifdef DEBUG_KVM
 #define DPRINTF(fmt, ...) \
     do { fprintf(stderr, fmt, ## __VA_ARGS__); } while (0)
@@ -730,6 +730,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
     r = kvm_check_extension(cs->kvm_state, KVM_CAP_TSC_CONTROL);
     if (r && env->tsc_khz) {
         r = kvm_vcpu_ioctl(cs, KVM_SET_TSC_KHZ, env->tsc_khz);
+        trace_point_f();
         if (r < 0) {
             fprintf(stderr, "KVM_SET_TSC_KHZ failed\n");
             return r;

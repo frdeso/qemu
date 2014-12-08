@@ -35,6 +35,8 @@
 
 #include <hw/ide/internal.h>
 
+#include <freezer.h>
+#include <trace.h>
 /* These values were based on a Seagate ST3500418AS but have been modified
    to make more sense in QEMU */
 static const int smart_attributes[][12] = {
@@ -590,6 +592,8 @@ static void ide_sector_read_cb(void *opaque, int ret)
 
     ide_set_irq(s->bus);
 
+    //try_wait prod
+        //post cons
     ide_set_sector(s, ide_get_sector(s) + n);
     s->nsector -= n;
     s->io_buffer_offset += 512 * n;
@@ -597,6 +601,7 @@ static void ide_sector_read_cb(void *opaque, int ret)
 
 void ide_sector_read(IDEState *s)
 {
+	trace_point_a();
     int64_t sector_num;
     int n;
 
@@ -631,8 +636,12 @@ void ide_sector_read(IDEState *s)
 
     block_acct_start(blk_get_stats(s->blk), &s->acct,
                      n * BDRV_SECTOR_SIZE, BLOCK_ACCT_READ);
+
+    //prod post
+   // freezer_prod_sem_post();
     s->pio_aiocb = blk_aio_readv(s->blk, sector_num, &s->qiov, n,
                                  ide_sector_read_cb, s);
+    //cons wait
 }
 
 static void dma_buf_commit(IDEState *s, uint32_t tx_bytes)
@@ -749,7 +758,6 @@ void ide_dma_cb(void *opaque, int ret)
         ide_dma_error(s);
         return;
     }
-
     switch (s->dma_cmd) {
     case IDE_DMA_READ:
         s->bus->dma->aiocb = dma_blk_read(s->blk, &s->sg, sector_num,
@@ -865,6 +873,7 @@ static void ide_sector_write_cb(void *opaque, int ret)
 
 void ide_sector_write(IDEState *s)
 {
+	trace_point_b();
     int64_t sector_num;
     int n;
 
@@ -919,6 +928,7 @@ static void ide_flush_cb(void *opaque, int ret)
 
 void ide_flush_cache(IDEState *s)
 {
+	trace_point_c();
     if (s->blk == NULL) {
         ide_flush_cb(s, 0);
         return;
@@ -1273,7 +1283,6 @@ static bool cmd_read_dma(IDEState *s, uint8_t cmd)
 
     ide_cmd_lba48_transform(s, lba48);
     ide_sector_start_dma(s, IDE_DMA_READ);
-
     return false;
 }
 

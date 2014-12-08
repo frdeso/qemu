@@ -25,6 +25,32 @@
 #
 # The <format-string> should be a sprintf()-compatible format string.
 
+#frdeso defined events
+point_a(void)
+point_b(void)
+point_c(void)
+point_d(void)
+point_e(void)
+freezer_clock_update(void)
+point_f(void)
+thread_id(void)
+sleep_before(void)
+sleep_after(void)
+io_req_on_port(int port, uint8_t is_write, int size, int count) "port %d, is_write %d, sz %d, cnt %d"
+global_mutex_lock_before(void)
+global_mutex_lock_after(void)
+global_mutex_unlock_before(void)
+global_mutex_unlock_after(void)
+thread_pool_handle_request(void *pool, void *req, void *opaque) "pool %p req %p opaque %p"
+thread_pool_handle_request_done(void *pool, void *req, void *opaque) "pool %p req %p opaque %p"
+
+freezer_prod_post(void)
+freezer_prod_trywait(int ret) "ret %d"
+freezer_cons_post_before(void)
+freezer_cons_post_after(void)
+freezer_cons_wait_before(void)
+freezer_cons_wait_after(void)
+
 # util/oslib-win32.c
 # util/oslib-posix.c
 qemu_memalign(size_t alignment, size_t size, void *ptr) "alignment %zu size %zu ptr %p"
@@ -550,6 +576,8 @@ usb_host_parse_endpoint(int bus, int addr, int ep, const char *dir, const char *
 usb_host_parse_error(int bus, int addr, const char *errmsg) "dev %d:%d, msg %s"
 
 # hw/scsi/scsi-bus.c
+
+scsi_read_aiocb(void)
 scsi_req_alloc(int target, int lun, int tag) "target %d lun %d tag %d"
 scsi_req_cancel(int target, int lun, int tag) "target %d lun %d tag %d"
 scsi_req_data(int target, int lun, int tag, int len) "target %d lun %d tag %d len %d"
@@ -1080,7 +1108,7 @@ win_helper_done(uint32_t tl) "tl=%d"
 win_helper_retry(uint32_t tl) "tl=%d"
 
 # dma-helpers.c
-dma_blk_io(void *dbs, void *bs, int64_t sector_num, bool to_dev) "dbs=%p bs=%p sector_num=%" PRId64 " to_dev=%d"
+dma_blk_io(void *dbs, void *bs, int64_t sector_num, int to_dev) "dbs=%p bs=%p sector_num=%" PRId64 " to_dev=%d"
 dma_aio_cancel(void *dbs) "dbs=%p"
 dma_complete(void *dbs, int ret, void *cb) "dbs=%p ret=%d cb=%p"
 dma_blk_cb(void *dbs, int ret) "dbs=%p ret=%d"

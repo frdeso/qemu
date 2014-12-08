@@ -14,6 +14,7 @@
 #include "qemu/thread.h"
 #include "qemu/main-loop.h"
 
+#include "freezer.h"
 /* #define DEBUG_IOMMU */
 
 int dma_memory_set(AddressSpace *as, dma_addr_t addr, uint8_t c, dma_addr_t len)
@@ -116,6 +117,7 @@ static void dma_complete(DMAAIOCB *dbs, int ret)
 {
     trace_dma_complete(dbs, ret, dbs->common.cb);
 
+	//trywait returns 0 on success
     dma_blk_unmap(dbs);
     if (dbs->common.cb) {
         dbs->common.cb(dbs->common.opaque, ret);
@@ -143,6 +145,8 @@ static void dma_blk_cb(void *opaque, int ret)
         dma_complete(dbs, ret);
         return;
     }
+
+    freezer_cons_sem_wait();
     dma_blk_unmap(dbs);
 
     while (dbs->sg_cur_index < dbs->sg->nsg) {

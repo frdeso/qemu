@@ -37,6 +37,7 @@ do { printf("scsi-disk: " fmt , ## __VA_ARGS__); } while (0)
 #include "sysemu/blockdev.h"
 #include "hw/block/block.h"
 #include "sysemu/dma.h"
+#include "trace.h"
 
 #ifdef __linux
 #include <scsi/sg.h>
@@ -237,7 +238,6 @@ static void scsi_dma_complete_noio(void *opaque, int ret)
 {
     SCSIDiskReq *r = (SCSIDiskReq *)opaque;
     SCSIDiskState *s = DO_UPCAST(SCSIDiskState, qdev, r->req.dev);
-
     if (r->req.aiocb != NULL) {
         r->req.aiocb = NULL;
         block_acct_done(blk_get_stats(s->qdev.conf.blk), &r->acct);

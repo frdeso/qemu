@@ -63,7 +63,7 @@
 #endif
 
 #endif /* CONFIG_LINUX */
-
+#include "trace.h"
 static CPUState *next_cpu;
 int64_t max_delay;
 int64_t max_advance;
@@ -195,7 +195,6 @@ int64_t cpu_get_ticks(void)
     timers_state.cpu_ticks_prev = ticks;
     return ticks;
 }
-
 static int64_t cpu_get_clock_locked(void)
 {
     int64_t ticks;
@@ -1119,6 +1118,7 @@ static bool qemu_in_vcpu_thread(void)
 
 void qemu_mutex_lock_iothread(void)
 {
+	trace_global_mutex_lock_before();
     if (!tcg_enabled()) {
         qemu_mutex_lock(&qemu_global_mutex);
     } else {
@@ -1130,11 +1130,14 @@ void qemu_mutex_lock_iothread(void)
         iothread_requesting_mutex = false;
         qemu_cond_broadcast(&qemu_io_proceeded_cond);
     }
+	trace_global_mutex_lock_after();
 }
 
 void qemu_mutex_unlock_iothread(void)
 {
+	trace_global_mutex_unlock_before();
     qemu_mutex_unlock(&qemu_global_mutex);
+	trace_global_mutex_unlock_after();
 }
 
 static int all_vcpus_paused(void)

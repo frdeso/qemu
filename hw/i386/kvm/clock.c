@@ -24,6 +24,7 @@
 #include <linux/kvm.h>
 #include <linux/kvm_para.h>
 
+#include <trace.h>
 #define TYPE_KVM_CLOCK "kvmclock"
 #define KVM_CLOCK(obj) OBJECT_CHECK(KVMClockState, (obj), TYPE_KVM_CLOCK)
 
@@ -49,6 +50,7 @@ struct pvclock_vcpu_time_info {
 
 static uint64_t kvmclock_current_nsec(KVMClockState *s)
 {
+
     CPUState *cpu = first_cpu;
     CPUX86State *env = cpu->env_ptr;
     hwaddr kvmclock_struct_pa = env->system_time_msr & ~1ULL;
@@ -82,6 +84,7 @@ static uint64_t kvmclock_current_nsec(KVMClockState *s)
 static void kvmclock_vm_state_change(void *opaque, int running,
                                      RunState state)
 {
+	trace_freezer_clock_update();
     KVMClockState *s = opaque;
     CPUState *cpu;
     int cap_clock_ctrl = kvm_check_extension(kvm_state, KVM_CAP_KVMCLOCK_CTRL);
