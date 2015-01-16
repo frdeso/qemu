@@ -1182,6 +1182,56 @@ void pause_all_vcpus(void)
     }
 }
 
+static int freezer_all_vcpus_paused_but_self(void)
+{
+    CPUState *cpu;
+    CPU_FOREACH(cpu) {
+    	if(qemu_cpu_is_self(cpu) == false)
+    	{
+	        if (!cpu->stopped) {
+    	        return 0;
+        	}
+        }
+    }
+
+    return 1;
+}
+void freezer_pause_all_vcpus_but_self(void)
+{
+    CPUState *cpu;
+
+	trace_freezer_before_pause() ;
+    qemu_clock_enable(QEMU_CLOCK_VIRTUAL, false);
+    CPU_FOREACH(cpu) {
+    	if(qemu_cpu_is_self(cpu) == false)
+    	{
+        	cpu->stop = true;
+        	qemu_cpu_kick(cpu);
+        }
+    }
+
+    if (qemu_in_vcpu_thread()) {
+        if (!kvm_enabled()) {
+            CPU_FOREACH(cpu) {
+    			if(qemu_cpu_is_self(cpu) == false)
+    			{
+                	cpu->stop = false;
+                	cpu->stopped = true;
+                }
+            }
+            return;
+        }
+    }
+
+    while (!freezer_all_vcpus_paused_but_self()) {
+        qemu_cond_wait(&qemu_pause_cond, &qemu_global_mutex);
+        CPU_FOREACH(cpu) {
+            qemu_cpu_kick(cpu);
+        }
+    }
+	trace_freezer_after_pause();
+}
+
 void cpu_resume(CPUState *cpu)
 {
     cpu->stop = false;

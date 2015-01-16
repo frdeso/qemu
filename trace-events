@@ -37,6 +37,7 @@ thread_id(void)
 sleep_before(void)
 sleep_after(void)
 io_req_on_port(int port, uint8_t is_write, int size, int count) "port %d, is_write %d, sz %d, cnt %d"
+#iomem_req_on_addr(int addr, int size, int is_write) "addr %d, sz %d, is_write %d"
 global_mutex_lock_before(void)
 global_mutex_lock_after(void)
 global_mutex_unlock_before(void)
@@ -44,12 +45,17 @@ global_mutex_unlock_after(void)
 thread_pool_handle_request(void *pool, void *req, void *opaque) "pool %p req %p opaque %p"
 thread_pool_handle_request_done(void *pool, void *req, void *opaque) "pool %p req %p opaque %p"
 
-freezer_prod_post(void)
-freezer_prod_trywait(int ret) "ret %d"
-freezer_cons_post_before(void)
-freezer_cons_post_after(void)
-freezer_cons_wait_before(void)
-freezer_cons_wait_after(void)
+freezer_interupted(void)
+freezer_before_pause(void)
+freezer_after_pause(void)
+freezer_kcd_get(long unsigned int kcd) "kcd %llu"
+freezer_kcd_set(long unsigned int kcd) "kcd %llu"
+
+freezer_sem_init(int sem_val) "sem_val %d"
+freezer_sem_post_before(void)
+freezer_sem_post_after(void)
+freezer_sem_wait_before(void)
+freezer_sem_wait_after(void)
 
 # util/oslib-win32.c
 # util/oslib-posix.c

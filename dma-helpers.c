@@ -146,7 +146,7 @@ static void dma_blk_cb(void *opaque, int ret)
         return;
     }
 
-    freezer_cons_sem_wait();
+    freezer_sem_wait();
     dma_blk_unmap(dbs);
 
     while (dbs->sg_cur_index < dbs->sg->nsg) {

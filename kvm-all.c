@@ -1742,6 +1742,7 @@ void kvm_cpu_clean_state(CPUState *cpu)
 #define CMP_RANGE(__port, __lower, __upper) \
 	(__port >= __lower && __port <= __upper)
 
+int freezer_kvm_vm_ioctl(KVMState *s, int type, ...);
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -1749,8 +1750,7 @@ int kvm_cpu_exec(CPUState *cpu)
 	struct kvm_clock_data kcd;
     DPRINTF("kvm_cpu_exec()\n");
 
-    freezer_prod_sem_init();
-    freezer_cons_sem_init();
+    freezer_sem_init();
     int freeze = false;
     if (kvm_arch_process_async_events(cpu)) {
         cpu->exit_request = 0;
@@ -1775,21 +1775,24 @@ int kvm_cpu_exec(CPUState *cpu)
         }
         qemu_mutex_unlock_iothread();
 
-		/*
-		 * According to /proc/ioports in the vm the ide ports are
-		 * between 0xc040 and 0xc04f (0d49216 and 0d49231)
-		 * Not sure if these may change at reboot.
-		 */
          if(freeze)
          {
             //We unlock the io threads so they can handle the request
-	  	    freezer_cons_sem_wait();
-	  	    //usleep(300);
+	  		freezer_sem_wait();
             freeze=false;
             trace_point_e();
     		KVMState *s = cpu->kvm_state;
-    		//kcd.clock += 1000000;
-			kvm_vm_ioctl(s, KVM_SET_CLOCK, &kcd);
+    		//We restore the old value of the clock
+    		//Sime the clock will be out of sync with the host,, kvm will think
+    		//that we migrated the vm and add the delta between the clocks as 
+    		//kvmclock_offset.
+    		//Monotonicity is essential. We have to make sure that time doesn't
+    		//go backward for the guest.
+			trace_freezer_kcd_set(kcd.clock);
+			qemu_mutex_lock_iothread();
+			freezer_kvm_vm_ioctl(s, KVM_SET_CLOCK, &kcd);
+			resume_all_vcpus();
+			qemu_mutex_unlock_iothread();
          }
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
@@ -1799,6 +1802,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
         if (run_ret < 0) {
             if (run_ret == -EINTR || run_ret == -EAGAIN) {
+            	trace_freezer_interupted();
                 DPRINTF("io window exit\n");
                 ret = EXCP_INTERRUPT;
                 break;
@@ -1816,17 +1820,23 @@ int kvm_cpu_exec(CPUState *cpu)
 			trace_io_req_on_port(run->io.port, run->io.direction != KVM_EXIT_IO_OUT,
                                     run->io.size, run->io.count);
             int port = run->io.port;
-            if(	CMP_RANGE(port, 0x0170, 0x0177) ||
-	            CMP_RANGE(port, 0x01f0, 0x01f7) ||
-	            CMP_RANGE(port, 0x0376, 0x0376) ||
-	            CMP_RANGE(port, 0x03f6, 0x03f6) ||
-	            CMP_RANGE(port, 0xc040, 0xc040)	)
-            {
-           		freeze = true;
-           		freezer_cons_sem_init();
-            	freezer_cons_sem_post();
+            /*
+             * Port range related to the disk
+             * according to /proc/ioport
+             * We freeze anything within this range
+             */
+     		if( CMP_RANGE(port, 0xc040, 0xc04f)	)
+     		{
     			KVMState *s = cpu->kvm_state;
-				kvm_vm_ioctl(s, KVM_GET_CLOCK, &kcd);
+    			//Save the guest system time.
+				freezer_kvm_vm_ioctl(s, KVM_GET_CLOCK, &kcd);
+				trace_freezer_kcd_get(kcd.clock);
+
+				freezer_pause_all_vcpus_but_self();
+
+           		freeze = true;
+           		freezer_sem_init();
+            	freezer_sem_post();
             }
             kvm_handle_io(run->io.port,
                           (uint8_t *)run + run->io.data_offset,
@@ -1836,6 +1846,9 @@ int kvm_cpu_exec(CPUState *cpu)
             ret = 0;
             break;
         case KVM_EXIT_MMIO:
+		//	iomem_req_on_addr(run->mmio.phys_addr,
+        //                run->mmio.len,
+        //                  run->mmio.is_write);
             DPRINTF("handle_mmio\n");
             cpu_physical_memory_rw(run->mmio.phys_addr,
                                    run->mmio.data,
@@ -1910,6 +1923,23 @@ int kvm_ioctl(KVMState *s, int type, ...)
     return ret;
 }
 
+int freezer_kvm_vm_ioctl(KVMState *s, int type, ...)
+{
+    int ret;
+    void *arg;
+    va_list ap;
+
+    va_start(ap, type);
+    arg = va_arg(ap, void *);
+    va_end(ap);
+
+    trace_kvm_vm_ioctl(type, arg);
+    ret = ioctl(s->vmfd, type, arg);
+    if (ret == -1) {
+        ret = -errno;
+    }
+    return ret;
+}
 int kvm_vm_ioctl(KVMState *s, int type, ...)
 {
     int ret;
@@ -1921,8 +1951,7 @@ int kvm_vm_ioctl(KVMState *s, int type, ...)
     va_end(ap);
 
     trace_kvm_vm_ioctl(type, arg);
-	freezer_cons_sem_post();
-	usleep(100);
+	freezer_sem_post();
     ret = ioctl(s->vmfd, type, arg);
     if (ret == -1) {
         ret = -errno;
@@ -1939,11 +1968,6 @@ int kvm_vcpu_ioctl(CPUState *cpu, int type, ...)
     va_start(ap, type);
     arg = va_arg(ap, void *);
     va_end(ap);
-
-//	if(freezer_prod_sem_trywait() == 0)
-//	{
-//		freezer_cons_sem_post();
-//	}
 
     trace_kvm_vcpu_ioctl(cpu->cpu_index, type, arg);
     ret = ioctl(cpu->kvm_fd, type, arg);

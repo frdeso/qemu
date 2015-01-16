@@ -1,37 +1,23 @@
 #include "freezer.h"
 #include "trace.h"
-static sem_t prod_sem;
-static sem_t cons_sem;
+static sem_t sem;
 
-void freezer_prod_sem_init(void)
+void freezer_sem_init(void)
 {
-	sem_init(&prod_sem, 0 , 0);
+	int val;
+	sem_init(&sem, 0 , 0);
+	sem_getvalue(&sem, &val);
+	trace_freezer_sem_init(val);
 }
-void freezer_prod_sem_post(void)
+void freezer_sem_post(void)
 {
-	sem_post(&prod_sem);
-	trace_freezer_prod_post();
+	trace_freezer_sem_post_before();
+	sem_post(&sem);
+	trace_freezer_sem_post_after();
 }
-int freezer_prod_sem_trywait(void)
+void freezer_sem_wait(void)
 {
-	int ret = sem_trywait(&prod_sem);
-	trace_freezer_prod_trywait(ret);
-	return ret;
-}
-
-void freezer_cons_sem_init(void)
-{
-	sem_init(&cons_sem, 0 , 0);
-}
-void freezer_cons_sem_post(void)
-{
-	trace_freezer_cons_post_before();
-	sem_post(&cons_sem);
-	trace_freezer_cons_post_after();
-}
-void freezer_cons_sem_wait(void)
-{
-	trace_freezer_cons_wait_before();
-	sem_wait(&cons_sem);
-	trace_freezer_cons_wait_after();
+	trace_freezer_sem_wait_before();
+	sem_wait(&sem);
+	trace_freezer_sem_wait_after();
 }
