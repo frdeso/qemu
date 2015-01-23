@@ -260,6 +260,19 @@ static void machine_set_iommu(Object *obj, bool value, Error **errp)
     ms->iommu = value;
 }
 
+static bool machine_get_freezer(Object *obj, Error **errp)
+{
+    MachineState *ms = MACHINE(obj);
+
+    return ms->freezer;
+}
+
+static void machine_set_freezer(Object *obj, bool value, Error **errp)
+{
+    MachineState *ms = MACHINE(obj);
+
+    ms->freezer = value;
+}
 static int error_on_sysbus_device(SysBusDevice *sbdev, void *opaque)
 {
     error_report("Option '-device %s' cannot be handled by this machine",
@@ -333,7 +346,9 @@ static void machine_initfn(Object *obj)
     object_property_add_bool(obj, "iommu",
                              machine_get_iommu,
                              machine_set_iommu, NULL);
-
+    object_property_add_bool(obj, "freezer",
+                             machine_get_freezer,
+                             machine_set_freezer, NULL);
     /* Register notifier when init is done for sysbus sanity checks */
     ms->sysbus_notifier.notify = machine_init_notify;
     qemu_add_machine_init_done_notifier(&ms->sysbus_notifier);

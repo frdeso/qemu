@@ -387,6 +387,10 @@ static QemuOptsList qemu_machine_opts = {
             .name = "iommu",
             .type = QEMU_OPT_BOOL,
             .help = "Set on/off to enable/disable Intel IOMMU (VT-d)",
+        },{
+            .name = "freezer",
+            .type = QEMU_OPT_BOOL,
+            .help = "Set freezer on/off",
         },
         { /* End of list */ }
     },

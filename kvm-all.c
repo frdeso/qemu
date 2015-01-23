@@ -1745,6 +1745,7 @@ void kvm_cpu_clean_state(CPUState *cpu)
 int freezer_kvm_vm_ioctl(KVMState *s, int type, ...);
 int kvm_cpu_exec(CPUState *cpu)
 {
+    bool freezer_on = qemu_opt_get_bool(qemu_get_machine_opts(), "freezer",false);
     struct kvm_run *run = cpu->kvm_run;
     int ret, run_ret;
 	struct kvm_clock_data kcd;
@@ -1775,7 +1776,7 @@ int kvm_cpu_exec(CPUState *cpu)
         }
         qemu_mutex_unlock_iothread();
 
-         if(freeze)
+         if(freezer_on && freeze)
          {
             //We unlock the io threads so they can handle the request
 	  		freezer_sem_wait();
@@ -1789,10 +1790,10 @@ int kvm_cpu_exec(CPUState *cpu)
     		//Monotonicity is essential. We have to make sure that time doesn't
     		//go backward for the guest.
 			trace_freezer_kcd_set(kcd.clock);
-			qemu_mutex_lock_iothread();
+			//qemu_mutex_lock_iothread();
 			freezer_kvm_vm_ioctl(s, KVM_SET_CLOCK, &kcd);
-			resume_all_vcpus();
-			qemu_mutex_unlock_iothread();
+			//resume_all_vcpus();
+			//qemu_mutex_unlock_iothread();
          }
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
@@ -1825,7 +1826,7 @@ int kvm_cpu_exec(CPUState *cpu)
              * according to /proc/ioport
              * We freeze anything within this range
              */
-     		if( CMP_RANGE(port, 0xc040, 0xc04f)	)
+     		if( freezer_on && CMP_RANGE(port, 0xc040, 0xc04f)	)
      		{
     			KVMState *s = cpu->kvm_state;
     			//Save the guest system time.

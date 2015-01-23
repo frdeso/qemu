@@ -37,7 +37,8 @@ DEF("machine", HAS_ARG, QEMU_OPTION_machine, \
     "                kvm_shadow_mem=size of KVM shadow MMU\n"
     "                dump-guest-core=on|off include guest memory in a core dump (default=on)\n"
     "                mem-merge=on|off controls memory merge support (default: on)\n"
-    "                iommu=on|off controls emulated Intel IOMMU (VT-d) support (default=off)\n",
+    "                iommu=on|off controls emulated Intel IOMMU (VT-d) support (default=off)\n"
+    "                freezer=on|off enables freezer (default=off)\n",
     QEMU_ARCH_ALL)
 STEXI
 @item -machine [type=]@var{name}[,prop=@var{value}[,...]]
@@ -66,6 +67,8 @@ the host, de-duplicates identical memory pages among VMs instances
 (enabled by default).
 @item iommu=on|off
 Enables or disables emulated Intel IOMMU (VT-d) support. The default is off.
+@item freezer=on|off
+Enables or disables freezer. The default is off.
 @end table
 ETEXI
 

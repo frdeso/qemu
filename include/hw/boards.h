@@ -133,6 +133,7 @@ struct MachineState {
     bool usb;
     char *firmware;
     bool iommu;
+    bool freezer;
 
     ram_addr_t ram_size;
     ram_addr_t maxram_size;
