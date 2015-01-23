@@ -1833,7 +1833,7 @@ int kvm_cpu_exec(CPUState *cpu)
 				freezer_kvm_vm_ioctl(s, KVM_GET_CLOCK, &kcd);
 				trace_freezer_kcd_get(kcd.clock);
 
-				freezer_pause_all_vcpus_but_self();
+				//freezer_pause_all_vcpus_but_self();
 
            		freeze = true;
            		freezer_sem_init();
